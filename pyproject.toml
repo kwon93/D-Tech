@@ -1,0 +1,9 @@
+[project]
+name = "dtech"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi>=0.133.1",
+    "uvicorn>=0.41.0",
+]
