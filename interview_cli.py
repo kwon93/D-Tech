@@ -6,16 +6,66 @@ import requests
 BASE_URL = "http://127.0.0.1:8000"
 
 
+def _extract_error_detail(resp: requests.Response) -> str:
+    content_type = (resp.headers.get("content-type") or "").lower()
+    if "application/json" in content_type:
+        try:
+            data = resp.json()
+            if isinstance(data, dict):
+                return str(data.get("detail") or data.get("message") or data)
+            return str(data)
+        except ValueError:
+            pass
+    text = (resp.text or "").strip()
+    return text if text else f"HTTP {resp.status_code}"
+
+
+def _parse_json_or_exit(resp: requests.Response, fallback_message: str) -> dict:
+    try:
+        data = resp.json()
+    except ValueError:
+        print(f"{fallback_message}: 서버가 JSON이 아닌 응답을 반환했습니다.")
+        sys.exit(1)
+    if not isinstance(data, dict):
+        print(f"{fallback_message}: 응답 형식이 올바르지 않습니다.")
+        sys.exit(1)
+    return data
+
+
+def _post(path: str, payload: dict) -> dict:
+    try:
+        resp = requests.post(f"{BASE_URL}{path}", json=payload, timeout=30)
+        resp.raise_for_status()
+        return _parse_json_or_exit(resp, "요청 처리에 실패했습니다")
+    except requests.exceptions.ConnectionError:
+        print("서버에 연결할 수 없습니다. 서버가 실행 중인지 확인하세요.")
+        sys.exit(1)
+    except requests.exceptions.Timeout:
+        print("요청 시간이 초과되었습니다. 잠시 후 다시 시도하세요.")
+        sys.exit(1)
+    except requests.exceptions.HTTPError as e:
+        detail = _extract_error_detail(e.response) if e.response is not None else str(e)
+        print(f"오류: {detail}")
+        sys.exit(1)
+
+
 def main():
     # 선택지 조회
     try:
-        resp = requests.get(f"{BASE_URL}/interview/options")
+        resp = requests.get(f"{BASE_URL}/interview/options", timeout=30)
         resp.raise_for_status()
     except requests.exceptions.ConnectionError:
         print("서버에 연결할 수 없습니다. 서버가 실행 중인지 확인하세요.")
         sys.exit(1)
+    except requests.exceptions.Timeout:
+        print("요청 시간이 초과되었습니다. 잠시 후 다시 시도하세요.")
+        sys.exit(1)
+    except requests.exceptions.HTTPError as e:
+        detail = _extract_error_detail(e.response) if e.response is not None else str(e)
+        print(f"선택지를 불러오지 못했습니다: {detail}")
+        sys.exit(1)
 
-    options = resp.json()
+    options = _parse_json_or_exit(resp, "선택지 조회에 실패했습니다")
     roles: dict = options["roles"]
     levels: list = options["levels"]
 
@@ -47,17 +97,11 @@ def main():
     if level is None:
         sys.exit(0)
 
-    stacks = [framework] + extras
-    print(f"\n[ {role} / {' + '.join(stacks)} / {level} ] 면접을 시작합니다...\n")
+    stacks_desc = framework if not extras else f"{framework} + {' + '.join(extras)}"
+    print(f"\n[ {role} / {stacks_desc} / {level} ] 면접을 시작합니다...\n")
 
     # 세션 생성
-    resp = requests.post(
-        f"{BASE_URL}/interview/setup",
-        json={"role": role, "framework": framework, "extras": extras, "level": level},
-    )
-    resp.raise_for_status()
-
-    data = resp.json()
+    data = _post("/interview/setup", {"role": role, "framework": framework, "extras": extras, "level": level})
     session_id = data["session_id"]
 
     print(f"[질문 {data['question_number']}/5]")
@@ -73,12 +117,7 @@ def main():
             print("답변을 입력해주세요.")
             continue
 
-        resp = requests.post(
-            f"{BASE_URL}/interview/answer",
-            json={"session_id": session_id, "answer": answer},
-        )
-        resp.raise_for_status()
-        data = resp.json()
+        data = _post("/interview/answer", {"session_id": session_id, "answer": answer})
 
         if data["finished"]:
             result = data["result"]
