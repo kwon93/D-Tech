@@ -30,5 +30,12 @@ class LLMQuotaExceededError(LLMResponseError):
         super().__init__(message)
 
 
+class LLMServiceUnavailableError(LLMResponseError):
+    """LLM provider 일시 장애/과부하"""
+
+    def __init__(self):
+        super().__init__("LLM 서비스가 일시적으로 혼잡합니다. 잠시 후 다시 시도해주세요.")
+
+
 class ProviderUnavailableError(InterviewError):
     """LLM provider 초기화 실패/미설정"""

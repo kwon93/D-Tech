@@ -46,5 +46,12 @@ def _is_quota_or_rate_limit_error(exc: Exception) -> bool:
         "http 429",
         "status code: 429",
         "error code: 429",
+        "service unavailable",
+        "status': 'unavailable'",
+        "status: unavailable",
+        "high demand",
+        "http 503",
+        "status code: 503",
+        "error code: 503",
     )
     return any(marker in msg for marker in markers)

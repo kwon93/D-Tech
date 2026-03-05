@@ -5,6 +5,7 @@ from app.core.exceptions import (
     InvalidInputError,
     LLMQuotaExceededError,
     LLMResponseError,
+    LLMServiceUnavailableError,
     SessionNotFoundError,
 )
 from app.services.interview import InterviewService
@@ -158,6 +159,15 @@ async def test_start_quota_error_raises_quota_exception():
     llm.chat.side_effect = RuntimeError("429 RESOURCE_EXHAUSTED. Please retry in 12.3s.")
     service = _make_service(llm)
     with pytest.raises(LLMQuotaExceededError, match="12초"):
+        await service.start(**VALID_SETUP)
+
+
+@pytest.mark.asyncio
+async def test_start_unavailable_error_raises_service_unavailable_exception():
+    llm = _make_llm()
+    llm.chat.side_effect = RuntimeError("503 UNAVAILABLE. This model is currently experiencing high demand.")
+    service = _make_service(llm)
+    with pytest.raises(LLMServiceUnavailableError):
         await service.start(**VALID_SETUP)
 
 

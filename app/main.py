@@ -11,6 +11,7 @@ from app.core.exceptions import (
     InvalidInputError,
     LLMQuotaExceededError,
     LLMResponseError,
+    LLMServiceUnavailableError,
     ProviderUnavailableError,
     SessionNotFoundError,
 )
@@ -71,6 +72,12 @@ async def provider_unavailable_handler(request: Request, exc: ProviderUnavailabl
 async def llm_quota_exceeded_handler(request: Request, exc: LLMQuotaExceededError):
     logger.warning("LLM 쿼터 초과: %s", exc)
     return JSONResponse(status_code=429, content={"detail": str(exc)})
+
+
+@app.exception_handler(LLMServiceUnavailableError)
+async def llm_service_unavailable_handler(request: Request, exc: LLMServiceUnavailableError):
+    logger.warning("LLM 서비스 혼잡: %s", exc)
+    return JSONResponse(status_code=503, content={"detail": str(exc)})
 
 
 @app.exception_handler(LLMResponseError)
