@@ -10,6 +10,7 @@ from app.core.constants import LEVELS, MAX_QUESTIONS, ROLES
 from app.core.exceptions import (
     InvalidInputError,
     LLMQuotaExceededError,
+    LLMServiceUnavailableError,
     LLMResponseError,
     SessionNotFoundError,
 )
@@ -102,9 +103,21 @@ class InterviewService:
         message = str(exc)
         lowered = message.lower()
         quota_markers = ("resource_exhausted", "quota exceeded", "rate limit", "too many requests")
+        unavailable_markers = (
+            "service unavailable",
+            "status': 'unavailable'",
+            "status: unavailable",
+            "high demand",
+            "http 503",
+            "status code: 503",
+            "error code: 503",
+            " 503 ",
+        )
         if any(marker in lowered for marker in quota_markers):
             retry_after = _extract_retry_after_seconds(lowered)
             return LLMQuotaExceededError(retry_after_seconds=retry_after)
+        if any(marker in lowered for marker in unavailable_markers):
+            return LLMServiceUnavailableError()
         return LLMResponseError(f"{phase} 실패: {message}")
 
     def get_result(self, session_id: str) -> InterviewSession:
